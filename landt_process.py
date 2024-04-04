@@ -3,10 +3,13 @@ import os
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
+from scipy.interpolate import splev, splrep
+from scipy.signal import savgol_filter
 
 
 def landt_file_loader(filepath, process=True):
     extension = os.path.splitext(filepath)[-1].lower()
+    # add functionality to read csv as it will be quicker
     if extension == '.xlsx':
         xlsx = pd.ExcelFile(os.path.join(filepath), engine='openpyxl')
     elif extension == '.xls':
@@ -66,6 +69,7 @@ def process_dataframe(df):
         'SpeCap/mAh/g', 'Voltage/V', 'dQ/dV/mAh/V',
         'CycleNo', 'StepNo'
     ]
+    # Gets the step time column that can be with different units
     step_time = next((item for item in df.columns.tolist() if item.startswith('StepTime')), None)
     columns_to_keep.append(step_time)
     new_df = df.copy()
@@ -144,3 +148,51 @@ def create_summary_from_dir(dir_path, save_dir=None):
                 print(f'Error processing file: {file}')
                 continue
 
+
+def clean_signal(voltage, capacity, dqdv,
+                 polynomial_spline=3, s_spline=1e-5,
+                 polyorder_1=5, window_size_1=101,
+                 polyorder_2=5, window_size_2=1001):
+    # Function that cleans the raw voltage, cap and dqdv data so can get smooth curves and derivatives
+
+    df = pd.DataFrame({'voltage': voltage, 'capacity': capacity, 'dqdv': dqdv}) 
+    unique_v = df.astype(float).groupby('voltage').mean().index() # get unique voltage values
+    unique_v_cap = df.astype(float).groupby('voltage').mean()['cap']
+    unique_v_dqdv = df.astype(float).groupby('voltage').mean()['dqdv']
+
+    x_volt = np.linspace(unique_v.min(), unique_v.max(), num=int(1e4))
+
+    spl_cap = splrep(unique_v, unique_v_cap, k=1, s=1.0)
+    cap = splev(x_volt, spl_cap)
+    smooth_cap = savgol_filter(cap, window_size_1, polyorder_1)
+
+    spl = splrep(unique_v, unique_v_dqdv, k=1, s=1.0)
+    y_dqdq = splev(x_volt, spl)
+    smooth_dqdv = savgol_filter(y_dqdq, window_size_1, polyorder_1)
+    smooth_spl_dqdv = splrep(x_volt, smooth_dqdv, k=polynomial_spline, s=s_spline)
+    dqdv_2 = splev(x_volt, smooth_spl_dqdv, der=1)
+    smooth_dqdv_2 = savgol_filter(dqdv_2, window_size_2, polyorder_2)
+    return x_volt, smooth_cap, smooth_dqdv_2
+
+
+def check_state(dqdv):
+    # Check if dqdv from discharge or charge (negative or positive peak)
+    peak_val = max(dqdv.min(), dqdv.max(), key=abs)
+    if peak_val > 0:
+        return 1
+    elif peak_val < 0:
+        return 0
+    else:
+        return 'R'
+
+
+def find_plat_cap(voltage, capacity, dqdv):
+    x_volt, smooth_cap, smooth_dqdv_2 = clean_signal(voltage, capacity, dqdv)
+    state = check_state(dqdv)
+    if state == 1:
+        plat_cap = round(smooth_cap[smooth_dqdv_2.argmin()], 3)
+    elif state == 0:
+        plat_cap = round(smooth_cap.max() - smooth_cap[smooth_dqdv_2.argmax()], 3)
+    else:
+        plat_cap = np.nan
+    return plat_cap
