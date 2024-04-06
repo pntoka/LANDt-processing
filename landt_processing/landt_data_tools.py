@@ -13,9 +13,34 @@ def landt_file_loader(filepath, process=True):
     # add functionality to read csv as it will be quicker
     if extension == '.xlsx':
         xlsx = pd.ExcelFile(os.path.join(filepath), engine='openpyxl')
+        df = xlsx_process(xlsx)
     elif extension == '.xls':
         xlsx = pd.ExcelFile(os.path.join(filepath))
+        df = xlsx_process(xlsx)
+    elif extension == '.csv':
+        df = pd.read_csv(os.path.join(filepath))
+        if df.columns[0] != 'Record':
+            raise ValueError('CSV file in wrong format')
 
+
+    # sheet_names = xlsx.sheet_names
+    # if len(sheet_names) == 1:       # if only one sheet, use that sheet
+    #     df = xlsx.parse(sheet_names[0])
+    #     if check_cycle_split(df):
+    #         df = multi_column_handler(xlsx, 0)
+    # else:
+    #     record_tab = find_record_tab(sheet_names)  # find the sheet with the record tab
+    #     if record_tab is not None:
+    #         df = xlsx.parse(sheet_names[record_tab])
+    #         if check_cycle_split(df):
+    #             df = multi_column_handler(xlsx, record_tab)
+    #     else:
+    #         raise ValueError('No sheet with record tab found in file')
+    df = process_dataframe(df) if process else df
+    return df
+
+
+def xlsx_process(xlsx):
     sheet_names = xlsx.sheet_names
     if len(sheet_names) == 1:       # if only one sheet, use that sheet
         df = xlsx.parse(sheet_names[0])
@@ -29,7 +54,6 @@ def landt_file_loader(filepath, process=True):
                 df = multi_column_handler(xlsx, record_tab)
         else:
             raise ValueError('No sheet with record tab found in file')
-    df = process_dataframe(df) if process else df
     return df
 
 
@@ -138,7 +162,7 @@ def create_summary_from_file(filepath, save_dir=None):
         summary_df.to_csv(os.path.join(file_folder, file_name+'_summary.csv'))
 
 
-def create_summary_from_dir(dir_path, save_dir=None):
+def create_summary_from_folder(dir_path, save_dir=None):
     # Creates a summary of cycling information from multiple files
     file_list = os.listdir(dir_path)
     for file in tqdm(file_list):
