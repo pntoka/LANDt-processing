@@ -21,21 +21,7 @@ def landt_file_loader(filepath, process=True):
         df = pd.read_csv(os.path.join(filepath))
         if df.columns[0] != 'Record':
             raise ValueError('CSV file in wrong format')
-
-
-    # sheet_names = xlsx.sheet_names
-    # if len(sheet_names) == 1:       # if only one sheet, use that sheet
-    #     df = xlsx.parse(sheet_names[0])
-    #     if check_cycle_split(df):
-    #         df = multi_column_handler(xlsx, 0)
-    # else:
-    #     record_tab = find_record_tab(sheet_names)  # find the sheet with the record tab
-    #     if record_tab is not None:
-    #         df = xlsx.parse(sheet_names[record_tab])
-    #         if check_cycle_split(df):
-    #             df = multi_column_handler(xlsx, record_tab)
-    #     else:
-    #         raise ValueError('No sheet with record tab found in file')
+        
     df = process_dataframe(df) if process else df
     return df
 
@@ -88,19 +74,14 @@ def multi_column_handler(xlsx, record_tab):
 
 
 def process_dataframe(df):
-    # Process the DataFrame
-    columns_to_keep = [
-        'Current/mA', 'Capacity/mAh',
-        'SpeCap/mAh/g', 'Voltage/V', 'dQ/dV/mAh/V',
-        'CycleNo', 'StepNo'
-    ]
-    # Gets the step time column that can be with different units
-    step_time = next((item for item in df.columns.tolist() if item.startswith('StepTime')), None)
-    columns_to_keep.append(step_time)
-    new_df = df.copy()
-    new_df = new_df[columns_to_keep]
+    # Process the DataFrame 
+    # Copy of old_land_processing function from BenSmithGreyGroup navani
+    
+    df = df[df['Current/mA'].apply(type) != str]
+    df = df[pd.notna(df['Current/mA'])]
 
     def land_state(x):
+        # 1 is positive current and 0 is negative current
         if x > 0:
             return 1
         elif x < 0:
@@ -110,14 +91,27 @@ def process_dataframe(df):
         else:
             print(x)
             raise ValueError('Unexpected value in current - not a number')
-        
-    new_df['state'] = new_df.loc[:, ('Current/mA')].apply(lambda x: land_state(x))
+    
+    df['state'] = df['Current/mA'].map(lambda x: land_state(x))
+    not_rest_idx = df[df['state'] != 'R'].index
+    df.loc[not_rest_idx, 'cycle change'] = df.loc[not_rest_idx, 'state'].ne(df.loc[not_rest_idx, 'state'].shift())
+    df['half cycle'] = (df['cycle change'] == True).cumsum()
+    df['full cycle'] = (df['half cycle']/2).apply(np.ceil)
+
+    columns_to_keep = [
+        'Current/mA', 'Capacity/mAh', 'state',
+        'SpeCap/mAh/g', 'Voltage/V', 'dQ/dV/mAh/V',
+    ]
+
+    new_df = df.copy()
+    new_df = new_df[columns_to_keep]
+    new_df['CycleNo'] = df['full cycle']
 
     return new_df
 
 
 def invert_charge_discharge(df):
-    # Inverts charge and discharge cycles zero becomes positive current and 1 becomes negative current
+    # Inverts charge and discharge cycles 0 becomes positive current and 1 becomes negative current
     df.loc[df['state'] == 0, 'state'] = 2
     df.loc[df['state'] == 1, 'state'] = 0
     df.loc[df['state'] == 2, 'state'] = 1
@@ -159,14 +153,15 @@ def create_summary_from_file(filepath, save_dir=None):
     if save_dir is not None:
         summary_df.to_csv(os.path.join(save_dir, file_name+'_summary.csv'))
     else:
-        summary_df.to_csv(os.path.join(file_folder, file_name+'_summary.csv'))
+        os.makedirs(os.path.join(file_folder, 'summary'), exist_ok=True)
+        summary_df.to_csv(os.path.join(file_folder, 'summary', file_name+'_summary.csv'))
 
 
 def create_summary_from_folder(dir_path, save_dir=None):
     # Creates a summary of cycling information from multiple files
     file_list = os.listdir(dir_path)
     for file in tqdm(file_list):
-        if file.endswith('.xlsx') or file.endswith('.xls'):
+        if file.endswith('.xlsx') or file.endswith('.xls') or file.endswith('.csv'):
             try:
                 create_summary_from_file(os.path.join(dir_path, file), save_dir)
             except:
