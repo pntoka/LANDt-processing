@@ -176,8 +176,8 @@ def clean_signal(voltage, capacity, dqdv,
     # Function that cleans the raw voltage, cap and dqdv data so can get smooth curves and derivatives
 
     df = pd.DataFrame({'voltage': voltage, 'capacity': capacity, 'dqdv': dqdv}) 
-    unique_v = df.astype(float).groupby('voltage').mean().index() # get unique voltage values
-    unique_v_cap = df.astype(float).groupby('voltage').mean()['cap']
+    unique_v = df.astype(float).groupby('voltage').mean().index  # get unique voltage values
+    unique_v_cap = df.astype(float).groupby('voltage').mean()['capacity']
     unique_v_dqdv = df.astype(float).groupby('voltage').mean()['dqdv']
 
     x_volt = np.linspace(unique_v.min(), unique_v.max(), num=int(1e4))
@@ -192,7 +192,9 @@ def clean_signal(voltage, capacity, dqdv,
     smooth_spl_dqdv = splrep(x_volt, smooth_dqdv, k=polynomial_spline, s=s_spline)
     dqdv_2 = splev(x_volt, smooth_spl_dqdv, der=1)
     smooth_dqdv_2 = savgol_filter(dqdv_2, window_size_2, polyorder_2)
-    return x_volt, smooth_cap, smooth_dqdv_2
+    peak_val = max(smooth_dqdv.min(), smooth_dqdv.max(), key=abs)
+    peak_idx = np.where(smooth_dqdv == peak_val)[0]
+    return x_volt, smooth_cap, smooth_dqdv_2, peak_idx   #need to return peak index to ignore very low volt data
 
 
 def check_state(dqdv):
@@ -207,23 +209,66 @@ def check_state(dqdv):
 
 
 def find_plat_cap(voltage, capacity, dqdv):
-    x_volt, smooth_cap, smooth_dqdv_2 = clean_signal(voltage, capacity, dqdv)
+    _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
     state = check_state(dqdv)
     if state == 1:
-        plat_cap = smooth_cap[smooth_dqdv_2.argmin()]
+        plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0]:].argmin()+peak_idx[0]]
     elif state == 0:
-        plat_cap = smooth_cap.max() - smooth_cap[smooth_dqdv_2.argmax()]
+        plat_cap = smooth_cap.max() - smooth_cap[smooth_dqdv_2[peak_idx[0]:].argmax()+peak_idx[0]]
     else:
         plat_cap = np.nan
     return plat_cap
 
 
-def plot_plateau(voltage, capacity, dqdv, line=False):
-    x_volt, smooth_cap, smooth_dqdv_2 = clean_signal(voltage, capacity, dqdv)
+def plot_plateau(ax, voltage, capacity, dqdv, line=False):
+    x_volt, smooth_cap, _, _ = clean_signal(voltage, capacity, dqdv)
     plat_cap = find_plat_cap(voltage, capacity, dqdv)
+    index_plat = np.argmin(np.abs(smooth_cap - plat_cap))
+    index_slop = np.argmin(np.abs(smooth_cap - (smooth_cap.max()-plat_cap)))
+    state = check_state(dqdv)
     if plat_cap is not np.nan:
-        plt.plot(smooth_cap, x_volt)
-        plt.scatter(plat_cap, x_volt[smooth_cap.index(plat_cap)], c='r', marker='x')
+        ax.plot(smooth_cap, x_volt)
+        if state == 0:
+            ax.scatter(smooth_cap[index_slop], x_volt[index_slop], c='r', marker='x',s=100)
+        elif state == 1:
+            ax.scatter(smooth_cap[index_plat], x_volt[index_plat], c='r', marker='x', s=100)
+        ax.set_xlabel('Capacity/mAh')
+        ax.set_ylabel('Voltage/V')
+        ax.text(100, 2, f'Plateau Capacity: {round(plat_cap, 2)} mAh/g, \nSloping capacity: {round(smooth_cap.max()-plat_cap, 2)} mAh/g', fontsize=14)
         if line:
-            plt.axhline(x_volt[smooth_cap.index(plat_cap)], color='r', linestyle='--')
+            if state == 0:
+                ax.axhline(x_volt[index_slop], color='r', linestyle='--')
+            elif state == 1:
+                ax.axhline(x_volt[index_plat], color='r', linestyle='--')
+
+
+def get_plat_from_file(filepath, plot=False):
+    df = landt_file_loader(filepath)
+    volt_0 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 0)]['Voltage/V'].values
+    volt_1 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 1)]['Voltage/V'].values
+    cap_0 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 0)]['SpeCap/mAh/g'].values
+    cap_1 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 1)]['SpeCap/mAh/g'].values
+    dqdv_0 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 0)]['dQ/dV/mAh/V'].values
+    dqdv_1 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 1)]['dQ/dV/mAh/V'].values
+
+    plat_cap_0 = find_plat_cap(volt_0, cap_0, dqdv_0)
+    plat_cap_1 = find_plat_cap(volt_1, cap_1, dqdv_1)
+    if plot:
+        fig, ax = plt.subplots(1, 2, figsize=(16, 10))
+        ax[0].set_title('Discharge', fontsize=16)
+        plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True)
+        ax[1].set_title('Charge', fontsize=16)
+        plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True)
+        plt.tight_layout()
         plt.show()
+    return plat_cap_0, plat_cap_1
+
+
+def get_charge_ice_mass(file_name_cex, summary_folder_path):
+    summary_file_csv = file_name_cex.replace('.cex', '_summary.csv')
+    summary_file_path = os.path.join(summary_folder_path, summary_file_csv)
+    summary_df = pd.read_csv(summary_file_path)
+    charge = summary_df.loc[summary_df['CycleNo'] == 1, 'Charge SpeCap/mAh/g'].values[0]
+    ice = summary_df.loc[summary_df['CycleNo'] == 1, 'CE'].values[0]
+    mass = summary_df.loc[summary_df['CycleNo'] == 1, 'Electrode mass/mg'].values[0]
+    return charge, ice, mass
