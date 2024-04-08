@@ -220,9 +220,12 @@ def find_plat_cap(voltage, capacity, dqdv):
     return plat_cap
 
 
-def plot_plateau(ax, voltage, capacity, dqdv, line=False):
+def plot_plateau(ax, voltage, capacity, dqdv, line=False, input_plat=None):
     x_volt, smooth_cap, _, _ = clean_signal(voltage, capacity, dqdv)
-    plat_cap = find_plat_cap(voltage, capacity, dqdv)
+    if input_plat is None:
+        plat_cap = find_plat_cap(voltage, capacity, dqdv)
+    else:
+        plat_cap = input_plat
     index_plat = np.argmin(np.abs(smooth_cap - plat_cap))
     index_slop = np.argmin(np.abs(smooth_cap - (smooth_cap.max()-plat_cap)))
     state = check_state(dqdv)
@@ -234,7 +237,7 @@ def plot_plateau(ax, voltage, capacity, dqdv, line=False):
             ax.scatter(smooth_cap[index_plat], x_volt[index_plat], c='r', marker='x', s=100)
         ax.set_xlabel('Capacity/mAh')
         ax.set_ylabel('Voltage/V')
-        ax.text(100, 2, f'Plateau Capacity: {round(plat_cap, 2)} mAh/g, \nSloping capacity: {round(smooth_cap.max()-plat_cap, 2)} mAh/g', fontsize=14)
+        ax.text(100, 1.7, f'Plateau Capacity: {round(plat_cap, 2)} mAh/g, \nSloping capacity: {round(smooth_cap.max()-plat_cap, 2)} mAh/g', fontsize=14)
         if line:
             if state == 0:
                 ax.axhline(x_volt[index_slop], color='r', linestyle='--')
@@ -242,7 +245,7 @@ def plot_plateau(ax, voltage, capacity, dqdv, line=False):
                 ax.axhline(x_volt[index_plat], color='r', linestyle='--')
 
 
-def get_plat_from_file(filepath, plot=False):
+def get_plat_from_file(filepath, plot=False, display_plot=False, save_dir=None):
     df = landt_file_loader(filepath)
     volt_0 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 0)]['Voltage/V'].values
     volt_1 = df.loc[(df['CycleNo'] == 1) & (df['state'] == 1)]['Voltage/V'].values
@@ -259,8 +262,12 @@ def get_plat_from_file(filepath, plot=False):
         plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True)
         ax[1].set_title('Charge', fontsize=16)
         plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True)
+        fig.suptitle(f'{Path(filepath).stem}', fontsize=16)
         plt.tight_layout()
-        plt.show()
+        if save_dir:
+            plt.savefig(os.path.join(save_dir, Path(filepath).stem+'_plateau.png'))
+        if display_plot:
+            plt.show()
     return plat_cap_0, plat_cap_1
 
 
@@ -272,3 +279,20 @@ def get_charge_ice_mass(file_name_cex, summary_folder_path):
     ice = summary_df.loc[summary_df['CycleNo'] == 1, 'CE'].values[0]
     mass = summary_df.loc[summary_df['CycleNo'] == 1, 'Electrode mass/mg'].values[0]
     return charge, ice, mass
+
+
+class PointPicker:
+    def __init__(self, ax):
+        self.ax = ax
+        self.picked_point = None
+        self.cid = ax.figure.canvas.mpl_connect('pick_event', self.on_pick)
+
+    def on_pick(self, event):
+        ind = event.ind[0]
+        x_picked = event.artist.get_xdata()[ind]
+        y_picked = event.artist.get_ydata()[ind]
+        print(f'Picked point: x={x_picked}, y={y_picked}')
+        self.picked_point = {'x': x_picked, 'y': y_picked}
+    
+    def disconnect(self):
+        self.ax.figure.canvas.mpl_disconnect(self.cid)
