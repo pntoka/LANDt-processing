@@ -422,3 +422,11 @@ def extract_echem_features(filepath, cycle_no=1, invert=False):
 
     echem_df = pd.DataFrame([ice, charge_cap, discharge_plat_cap, charge_plat_cap])
     return echem_df
+
+
+def df_transpose(df):
+    df = df.transpose().reset_index()
+    df.drop('index', axis=1, inplace=True)
+    df.columns = df.iloc[0]
+    df = df[1:]
+    return df
