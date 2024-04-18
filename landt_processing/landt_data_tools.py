@@ -209,12 +209,48 @@ def check_state(dqdv):
 
 
 def find_plat_cap(voltage, capacity, dqdv):
+    # First iteration of finding the plateau capacity, takes min of 2nd derivative for charge and max for discharge
     _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
     state = check_state(dqdv)
     if state == 1:
         plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0]:].argmin()+peak_idx[0]]
     elif state == 0:
         plat_cap = smooth_cap.max() - smooth_cap[smooth_dqdv_2[peak_idx[0]:].argmax()+peak_idx[0]]
+    else:
+        plat_cap = np.nan
+    return plat_cap
+
+def find_plat_cap_2(voltage, capacity, dqdv):
+    # Second iteration of finding the plateau capacity, takes min of 2nd derivative for charge and point in between max/min inflection points for discharge
+    # Preffered method as gives better results for discharge
+    _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
+    state = check_state(dqdv)
+    if state == 1:
+        plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0]:].argmin()+peak_idx[0]]
+    elif state == 0:
+        min_peak = smooth_dqdv_2[peak_idx[0]:].argmin()+peak_idx[0]
+        max_peak = smooth_dqdv_2[peak_idx[0]:].argmax()+peak_idx[0]
+        plat_point = round((min_peak + max_peak)/2).astype(int)
+        plat_cap = smooth_cap.max() - smooth_cap[plat_point]
+    else:
+        plat_cap = np.nan
+    return plat_cap
+
+
+def find_plat_cap_3(voltage, capacity, dqdv):
+    # Third iteration of finding the plateau capacity, takes point in between max/min inflection points for charge and discharge
+    _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
+    state = check_state(dqdv)
+    if state == 1:
+        min_peak = smooth_dqdv_2[peak_idx[0]:].argmin()+peak_idx[0]
+        max_peak = smooth_dqdv_2[peak_idx[0]:].argmax()+peak_idx[0]
+        plat_point = round((min_peak + max_peak)/2).astype(int)
+        plat_cap = smooth_cap[plat_point]
+    elif state == 0:
+        min_peak = smooth_dqdv_2[peak_idx[0]:].argmin()+peak_idx[0]
+        max_peak = smooth_dqdv_2[peak_idx[0]:].argmax()+peak_idx[0]
+        plat_point = round((min_peak + max_peak)/2).astype(int)
+        plat_cap = smooth_cap.max() - smooth_cap[plat_point]
     else:
         plat_cap = np.nan
     return plat_cap
@@ -235,7 +271,7 @@ def plot_plateau(ax, voltage, capacity, dqdv, line=False, input_plat=None):
             ax.scatter(smooth_cap[index_slop], x_volt[index_slop], c='r', marker='x',s=100)
         elif state == 1:
             ax.scatter(smooth_cap[index_plat], x_volt[index_plat], c='r', marker='x', s=100)
-        ax.set_xlabel('Capacity/mAh')
+        ax.set_xlabel('Capacity/mAh/g')
         ax.set_ylabel('Voltage/V')
         ax.text(100, 1.7, f'Plateau Capacity: {round(plat_cap, 2)} mAh/g, \nSloping capacity: {round(smooth_cap.max()-plat_cap, 2)} mAh/g', fontsize=14)
         if line:

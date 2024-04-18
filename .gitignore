@@ -2,3 +2,5 @@ tests/__pycache__/__init__.cpython-310.pyc
 *.pyc
 *.egg-info/
 build/
+*.DS_Store
+*.vscode
