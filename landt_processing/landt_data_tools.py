@@ -23,6 +23,7 @@ def landt_file_loader(filepath, process=True):
             raise ValueError('CSV file in wrong format')
     if extension in ['.xlsx', '.csv', 'xls']:
         df = process_dataframe(df) if process else df
+        return df
     elif extension not in ['.xlsx', '.csv', 'xls']:
         raise ValueError('File extension not supported')
 
