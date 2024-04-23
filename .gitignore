@@ -1,13 +1,6 @@
 tests/__pycache__/__init__.cpython-310.pyc
 *.pyc
-landt_processing.egg-info/top_level.txt
-landt_processing.egg-info/SOURCES.txt
-landt_processing.egg-info/requires.txt
-landt_processing.egg-info/PKG-INFO
-landt_processing.egg-info/dependency_links.txt
-build/lib/landt_processing/Examples/__init__.py
-build/lib/landt_processing/tests/__init__.py
-build/lib/landt_processing/__init__.py
-build/lib/landt_processing/landt_data_tools.py
-build/lib/landt_processing/Examples/pandas_playground.py
-build/lib/landt_processing/tests/test_data_tools.py
+*.egg-info/
+build/
+*.DS_Store
+*.vscode
