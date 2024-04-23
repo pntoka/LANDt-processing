@@ -21,9 +21,10 @@ def landt_file_loader(filepath, process=True):
         df = pd.read_csv(os.path.join(filepath))
         if df.columns[0] != 'Record':
             raise ValueError('CSV file in wrong format')
-        
-    df = process_dataframe(df) if process else df
-    return df
+    if extension in ['.xlsx', '.csv', 'xls']:
+        df = process_dataframe(df) if process else df
+    elif extension not in ['.xlsx', '.csv', 'xls']:
+        raise ValueError('File extension not supported')
 
 
 def xlsx_process(xlsx):
