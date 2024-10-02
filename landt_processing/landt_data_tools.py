@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from scipy.interpolate import splev, splrep
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter, argrelmax, argrelmin
 import matplotlib.pyplot as plt
 
 
@@ -248,40 +248,40 @@ def check_state(dqdv):
 
 
 def find_plat_cap(voltage, capacity, dqdv):
-    # First iteration of finding the plateau capacity, takes min of 2nd derivative for charge and max for discharge
+    # Finds the plateau capacity, takes min of 2nd derivative for charge and point in between max/min inflection points for discharge
+    # Preferred method as gives better results for discharge, uses argrelmin and argrelmax to find inflection points
     _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
     state = check_state(dqdv)
     if state == 1:
-        plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]]
+        plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0]:].argmin() + peak_idx[0]]
     elif state == 0:
-        plat_cap = (
-            smooth_cap.max()
-            - smooth_cap[smooth_dqdv_2[peak_idx[0] :].argmax() + peak_idx[0]]
-        )
+        min_peak = argrelmin(smooth_dqdv_2[peak_idx[0]:], order=10)[0].min() + peak_idx[0]
+        max_peak = argrelmax(smooth_dqdv_2[peak_idx[0]:], order=10)[0].min() + peak_idx[0]
+        plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
+        plat_cap = smooth_cap.max() - smooth_cap[plat_point]
     else:
         plat_cap = np.nan
     return plat_cap
+
+
+# def find_plat_cap(voltage, capacity, dqdv):
+#     # First iteration of finding the plateau capacity, takes min of 2nd derivative for charge and max for discharge
+#     _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
+#     state = check_state(dqdv)
+#     if state == 1:
+#         plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]]
+#     elif state == 0:
+#         plat_cap = (
+#             smooth_cap.max()
+#             - smooth_cap[smooth_dqdv_2[peak_idx[0] :].argmax() + peak_idx[0]]
+#         )
+#     else:
+#         plat_cap = np.nan
+#     return plat_cap
 
 
 def find_plat_cap_2(voltage, capacity, dqdv):
-    # Second iteration of finding the plateau capacity, takes min of 2nd derivative for charge and point in between max/min inflection points for discharge
-    # Preffered method as gives better results for discharge
-    _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
-    state = check_state(dqdv)
-    if state == 1:
-        plat_cap = smooth_cap[smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]]
-    elif state == 0:
-        min_peak = smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]
-        max_peak = smooth_dqdv_2[peak_idx[0] :].argmax() + peak_idx[0]
-        plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
-        plat_cap = smooth_cap.max() - smooth_cap[plat_point]
-    else:
-        plat_cap = np.nan
-    return plat_cap
-
-
-def find_plat_cap_3(voltage, capacity, dqdv):
-    # Third iteration of finding the plateau capacity, takes point in between max/min inflection points for charge and discharge
+    # Alternative vesion of finding the plateau capacity, takes point in between max/min inflection points for charge and discharge
     _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
     state = check_state(dqdv)
     if state == 1:
@@ -290,31 +290,51 @@ def find_plat_cap_3(voltage, capacity, dqdv):
         plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
         plat_cap = smooth_cap[plat_point]
     elif state == 0:
-        min_peak = smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]
-        max_peak = smooth_dqdv_2[peak_idx[0] :].argmax() + peak_idx[0]
+        min_peak = argrelmin(smooth_dqdv_2[peak_idx[0]:], order=10)[0].min() + peak_idx[0]
+        max_peak = argrelmax(smooth_dqdv_2[peak_idx[0]:], order=10)[0].min() + peak_idx[0]
         plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
         plat_cap = smooth_cap.max() - smooth_cap[plat_point]
     else:
         plat_cap = np.nan
     return plat_cap
 
-def find_plat_cap_4(voltage, capacity, dqdv):
-    # Third iteration of finding the plateau capacity, takes point in between max/min inflection points for charge and discharge
-    _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
-    state = check_state(dqdv)
-    if state == 1:
-        min_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmin() + peak_idx[0]
-        max_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmax() + peak_idx[0]
-        plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
-        plat_cap = smooth_cap[plat_point]
-    elif state == 0:
-        min_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmin() + peak_idx[0]
-        max_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmax() + peak_idx[0]
-        plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
-        plat_cap = smooth_cap.max() - smooth_cap[plat_point]
-    else:
-        plat_cap = np.nan
-    return plat_cap
+
+# def find_plat_cap_3(voltage, capacity, dqdv):
+#     # Third iteration of finding the plateau capacity, takes point in between max/min inflection points for charge and discharge
+#     _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
+#     state = check_state(dqdv)
+#     if state == 1:
+#         min_peak = smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]
+#         max_peak = smooth_dqdv_2[peak_idx[0] :].argmax() + peak_idx[0]
+#         plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
+#         plat_cap = smooth_cap[plat_point]
+#     elif state == 0:
+#         min_peak = smooth_dqdv_2[peak_idx[0] :].argmin() + peak_idx[0]
+#         max_peak = smooth_dqdv_2[peak_idx[0] :].argmax() + peak_idx[0]
+#         plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
+#         plat_cap = smooth_cap.max() - smooth_cap[plat_point]
+#     else:
+#         plat_cap = np.nan
+#     return plat_cap
+
+
+# def find_plat_cap_4(voltage, capacity, dqdv):
+#     # Fourth iteration of finding the plateau capacity, takes point in between max/min inflection points for charge and discharge
+#     _, smooth_cap, smooth_dqdv_2, peak_idx = clean_signal(voltage, capacity, dqdv)
+#     state = check_state(dqdv)
+#     if state == 1:
+#         min_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmin() + peak_idx[0]
+#         max_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmax() + peak_idx[0]
+#         plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
+#         plat_cap = smooth_cap[plat_point]
+#     elif state == 0:
+#         min_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmin() + peak_idx[0]
+#         max_peak = smooth_dqdv_2[peak_idx[0] :peak_idx[0]+800].argmax() + peak_idx[0]
+#         plat_point = round((min_peak + max_peak) / 2, 0).astype(int)
+#         plat_cap = smooth_cap.max() - smooth_cap[plat_point]
+#     else:
+#         plat_cap = np.nan
+#     return plat_cap
 
 
 def plot_plateau(ax, voltage, capacity, dqdv, line=False, input_plat=None, method=1):
@@ -323,11 +343,11 @@ def plot_plateau(ax, voltage, capacity, dqdv, line=False, input_plat=None, metho
         plat_cap = find_plat_cap(voltage, capacity, dqdv)
     elif input_plat is None and method == 2:
         plat_cap = find_plat_cap_2(voltage, capacity, dqdv)
-    elif input_plat is None and method == 3:
-        plat_cap = find_plat_cap_3(voltage, capacity, dqdv)
-    elif input_plat is None and method == 4:
-        plat_cap = find_plat_cap_4(voltage, capacity, dqdv)
-    else:
+    # elif input_plat is None and method == 3:
+    #     plat_cap = find_plat_cap_3(voltage, capacity, dqdv)
+    # elif input_plat is None and method == 4:
+    #     plat_cap = find_plat_cap_4(voltage, capacity, dqdv)
+    # else:
         plat_cap = input_plat
     index_plat = np.argmin(np.abs(smooth_cap - plat_cap))
     index_slop = np.argmin(np.abs(smooth_cap - (smooth_cap.max() - plat_cap)))
@@ -382,6 +402,7 @@ def get_plat_from_file(filepath, plot=False, display_plot=False, save_dir=None):
             plt.show()
     return plat_cap_0, plat_cap_1
 
+
 def get_plat_from_file_2(filepath, plot=False, display_plot=False, save_dir=None):
     df = landt_file_loader(filepath)
     volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
@@ -408,56 +429,56 @@ def get_plat_from_file_2(filepath, plot=False, display_plot=False, save_dir=None
     return plat_cap_0, plat_cap_1
 
 
-def get_plat_from_file_3(filepath, plot=False, display_plot=False, save_dir=None):
-    df = landt_file_loader(filepath)
-    volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
-    volt_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["Voltage/V"].values
-    cap_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["SpeCap/mAh/g"].values
-    cap_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["SpeCap/mAh/g"].values
-    dqdv_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
-    dqdv_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
+# def get_plat_from_file_3(filepath, plot=False, display_plot=False, save_dir=None):
+#     df = landt_file_loader(filepath)
+#     volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
+#     volt_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["Voltage/V"].values
+#     cap_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["SpeCap/mAh/g"].values
+#     cap_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["SpeCap/mAh/g"].values
+#     dqdv_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
+#     dqdv_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
 
-    plat_cap_0 = find_plat_cap_3(volt_0, cap_0, dqdv_0)
-    plat_cap_1 = find_plat_cap_3(volt_1, cap_1, dqdv_1)
-    if plot:
-        fig, ax = plt.subplots(1, 2, figsize=(16, 10))
-        ax[0].set_title("Discharge", fontsize=16)
-        plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True, method=3)
-        ax[1].set_title("Charge", fontsize=16)
-        plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True, method=3)
-        fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
-        plt.tight_layout()
-        if save_dir:
-            plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
-        if display_plot:
-            plt.show()
-    return plat_cap_0, plat_cap_1
+#     plat_cap_0 = find_plat_cap_3(volt_0, cap_0, dqdv_0)
+#     plat_cap_1 = find_plat_cap_3(volt_1, cap_1, dqdv_1)
+#     if plot:
+#         fig, ax = plt.subplots(1, 2, figsize=(16, 10))
+#         ax[0].set_title("Discharge", fontsize=16)
+#         plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True, method=3)
+#         ax[1].set_title("Charge", fontsize=16)
+#         plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True, method=3)
+#         fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
+#         plt.tight_layout()
+#         if save_dir:
+#             plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
+#         if display_plot:
+#             plt.show()
+#     return plat_cap_0, plat_cap_1
 
 
-def get_plat_from_file_4(filepath, plot=False, display_plot=False, save_dir=None):
-    df = landt_file_loader(filepath)
-    volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
-    volt_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["Voltage/V"].values
-    cap_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["SpeCap/mAh/g"].values
-    cap_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["SpeCap/mAh/g"].values
-    dqdv_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
-    dqdv_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
+# def get_plat_from_file_4(filepath, plot=False, display_plot=False, save_dir=None):
+#     df = landt_file_loader(filepath)
+#     volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
+#     volt_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["Voltage/V"].values
+#     cap_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["SpeCap/mAh/g"].values
+#     cap_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["SpeCap/mAh/g"].values
+#     dqdv_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
+#     dqdv_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
 
-    plat_cap_0 = find_plat_cap_4(volt_0, cap_0, dqdv_0)
-    plat_cap_1 = find_plat_cap_4(volt_1, cap_1, dqdv_1)
-    if plot:
-        fig, ax = plt.subplots(1, 2, figsize=(16, 10))
-        ax[0].set_title("Discharge", fontsize=16)
-        plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True, method=4)
-        ax[1].set_title("Charge", fontsize=16)
-        plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True, method=4)
-        fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
-        plt.tight_layout()
-        if save_dir:
-            plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
-        if display_plot:
-            plt.show()
-    return plat_cap_0, plat_cap_1
+#     plat_cap_0 = find_plat_cap_4(volt_0, cap_0, dqdv_0)
+#     plat_cap_1 = find_plat_cap_4(volt_1, cap_1, dqdv_1)
+#     if plot:
+#         fig, ax = plt.subplots(1, 2, figsize=(16, 10))
+#         ax[0].set_title("Discharge", fontsize=16)
+#         plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True, method=4)
+#         ax[1].set_title("Charge", fontsize=16)
+#         plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True, method=4)
+#         fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
+#         plt.tight_layout()
+#         if save_dir:
+#             plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
+#         if display_plot:
+#             plt.show()
+#     return plat_cap_0, plat_cap_1
 
 
 
