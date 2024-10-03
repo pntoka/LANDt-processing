@@ -247,6 +247,19 @@ def check_state(dqdv):
         return "R"
 
 
+def find_plat_cap_conv(voltage, capacity, dqdv, cutoff=0.1):
+    state = check_state(dqdv)
+    if state == 1:
+        volt_idx = np.argmin(np.abs(voltage - cutoff))
+        plat_cap = capacity[volt_idx]
+    elif state == 0:
+        volt_idx = np.argmin(np.abs(voltage - cutoff))
+        plat_cap = capacity.max() - capacity[volt_idx]
+    else:
+        plat_cap = np.nan
+    return plat_cap
+
+
 def find_plat_cap(voltage, capacity, dqdv):
     # Finds the plateau capacity, takes min of 2nd derivative for charge and point in between max/min inflection points for discharge
     # This methodd gives better visual results for discharge, uses argrelmin and argrelmax to find inflection points
@@ -262,7 +275,6 @@ def find_plat_cap(voltage, capacity, dqdv):
     else:
         plat_cap = np.nan
     return plat_cap
-
 
 
 def find_plat_cap_2(voltage, capacity, dqdv):
@@ -446,6 +458,32 @@ def get_plat_from_file_3(filepath, cycle_no=1, plot=False, display_plot=False, s
         plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True, method=3)
         ax[1].set_title("Charge", fontsize=16)
         plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True, method=3)
+        fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
+        plt.tight_layout()
+        if save_dir:
+            plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
+        if display_plot:
+            plt.show()
+    return plat_cap_0, plat_cap_1
+
+
+def get_plat_from_file_conv(filepath, cycle_no=1, plot=False, display_plot=False, save_dir=None):
+    df = landt_file_loader(filepath)
+    volt_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["Voltage/V"].values
+    volt_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["Voltage/V"].values
+    cap_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["SpeCap/mAh/g"].values
+    cap_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["SpeCap/mAh/g"].values
+    dqdv_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
+    dqdv_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
+
+    plat_cap_0 = find_plat_cap_conv(volt_0, cap_0, dqdv_0)
+    plat_cap_1 = find_plat_cap_conv(volt_1, cap_1, dqdv_1)
+    if plot:
+        fig, ax = plt.subplots(1, 2, figsize=(16, 10))
+        ax[0].set_title("Discharge", fontsize=16)
+        plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True)
+        ax[1].set_title("Charge", fontsize=16)
+        plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True)
         fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
         plt.tight_layout()
         if save_dir:
