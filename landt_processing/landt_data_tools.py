@@ -377,14 +377,14 @@ def plot_plateau(ax, voltage, capacity, dqdv, line=False, input_plat=None, metho
                 ax.axhline(x_volt[index_plat], color="r", linestyle="--")
 
 
-def get_plat_from_file(filepath, plot=False, display_plot=False, save_dir=None):
+def get_plat_from_file(filepath, cycle_no=1, plot=False, display_plot=False, save_dir=None):
     df = landt_file_loader(filepath)
-    volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
-    volt_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["Voltage/V"].values
-    cap_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["SpeCap/mAh/g"].values
-    cap_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["SpeCap/mAh/g"].values
-    dqdv_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
-    dqdv_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
+    volt_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["Voltage/V"].values
+    volt_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["Voltage/V"].values
+    cap_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["SpeCap/mAh/g"].values
+    cap_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["SpeCap/mAh/g"].values
+    dqdv_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
+    dqdv_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
 
     plat_cap_0 = find_plat_cap(volt_0, cap_0, dqdv_0)
     plat_cap_1 = find_plat_cap(volt_1, cap_1, dqdv_1)
@@ -403,14 +403,14 @@ def get_plat_from_file(filepath, plot=False, display_plot=False, save_dir=None):
     return plat_cap_0, plat_cap_1
 
 
-def get_plat_from_file_2(filepath, plot=False, display_plot=False, save_dir=None):
+def get_plat_from_file_2(filepath, cycle_no=1, plot=False, display_plot=False, save_dir=None):
     df = landt_file_loader(filepath)
-    volt_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["Voltage/V"].values
-    volt_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["Voltage/V"].values
-    cap_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["SpeCap/mAh/g"].values
-    cap_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["SpeCap/mAh/g"].values
-    dqdv_0 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
-    dqdv_1 = df.loc[(df["CycleNo"] == 1) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
+    volt_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["Voltage/V"].values
+    volt_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["Voltage/V"].values
+    cap_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["SpeCap/mAh/g"].values
+    cap_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["SpeCap/mAh/g"].values
+    dqdv_0 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 0)]["dQ/dV/mAh/V"].values
+    dqdv_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)]["dQ/dV/mAh/V"].values
 
     plat_cap_0 = find_plat_cap_2(volt_0, cap_0, dqdv_0)
     plat_cap_1 = find_plat_cap_2(volt_1, cap_1, dqdv_1)
@@ -531,8 +531,8 @@ def extract_echem_features(filepath, cycle_no=1, invert=False):
     dqdv_1 = df.loc[(df["CycleNo"] == cycle_no) & (df["state"] == 1)][
         "dQ/dV/mAh/V"
     ].values
-    plat_cap_0 = find_plat_cap_2(volt_0, cap_0, dqdv_0)
-    plat_cap_1 = find_plat_cap_2(volt_1, cap_1, dqdv_1)
+    plat_cap_0 = find_plat_cap(volt_0, cap_0, dqdv_0)
+    plat_cap_1 = find_plat_cap(volt_1, cap_1, dqdv_1)
 
     ice = {"Parameter": "ICE", "Value": round(cap_1.max() / cap_0.max(), 4)}
     charge_cap = {"Parameter": "Charge SpeCap/mAh/g", "Value": round(cap_1.max(), 2)}
