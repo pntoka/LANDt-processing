@@ -578,6 +578,9 @@ def extract_echem_features(filepath, cycle_no=1, method=1, invert=False):
     elif method == 3:
         plat_cap_0 = find_plat_cap_3(volt_0, cap_0, dqdv_0)
         plat_cap_1 = find_plat_cap_3(volt_1, cap_1, dqdv_1)
+    elif method == 'conv':
+        plat_cap_0 = find_plat_cap_conv(volt_0, cap_0, dqdv_0)
+        plat_cap_1 = find_plat_cap_conv(volt_1, cap_1, dqdv_1)
 
     ice = {"Parameter": "ICE", "Value": round(cap_1.max() / cap_0.max(), 4)}
     charge_cap = {"Parameter": "Charge SpeCap/mAh/g", "Value": round(cap_1.max(), 2)}
