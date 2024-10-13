@@ -357,6 +357,8 @@ def plot_plateau(ax, voltage, capacity, dqdv, line=False, input_plat=None, metho
         plat_cap = find_plat_cap_2(voltage, capacity, dqdv)
     elif input_plat is None and method == 3:
         plat_cap = find_plat_cap_3(voltage, capacity, dqdv)
+    elif input_plat is None and method == 'conv':
+        plat_cap = find_plat_cap_conv(voltage, capacity, dqdv)
     # elif input_plat is None and method == 4:
     #     plat_cap = find_plat_cap_4(voltage, capacity, dqdv)
     else:
@@ -481,9 +483,9 @@ def get_plat_from_file_conv(filepath, cycle_no=1, plot=False, display_plot=False
     if plot:
         fig, ax = plt.subplots(1, 2, figsize=(16, 10))
         ax[0].set_title("Discharge", fontsize=16)
-        plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True)
+        plot_plateau(ax[0], volt_0, cap_0, dqdv_0, line=True, method='conv')
         ax[1].set_title("Charge", fontsize=16)
-        plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True)
+        plot_plateau(ax[1], volt_1, cap_1, dqdv_1, line=True, method='conv')
         fig.suptitle(f"{Path(filepath).stem}", fontsize=16)
         plt.tight_layout()
         if save_dir:
