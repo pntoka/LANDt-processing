@@ -414,6 +414,7 @@ def get_plat_from_file(filepath, cycle_no=1, plot=False, display_plot=False, sav
             plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
         if display_plot:
             plt.show()
+        return plat_cap_0, plat_cap_1, fig
     return plat_cap_0, plat_cap_1
 
 
@@ -440,6 +441,7 @@ def get_plat_from_file_2(filepath, cycle_no=1, plot=False, display_plot=False, s
             plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
         if display_plot:
             plt.show()
+        return plat_cap_0, plat_cap_1, fig
     return plat_cap_0, plat_cap_1
 
 
@@ -466,6 +468,7 @@ def get_plat_from_file_3(filepath, cycle_no=1, plot=False, display_plot=False, s
             plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
         if display_plot:
             plt.show()
+        return plat_cap_0, plat_cap_1, fig
     return plat_cap_0, plat_cap_1
 
 
@@ -492,6 +495,7 @@ def get_plat_from_file_conv(filepath, cycle_no=1, plot=False, display_plot=False
             plt.savefig(os.path.join(save_dir, Path(filepath).stem + "_plateau.png"))
         if display_plot:
             plt.show()
+        return plat_cap_0, plat_cap_1, fig
     return plat_cap_0, plat_cap_1
 
 
