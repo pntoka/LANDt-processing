@@ -609,3 +609,39 @@ def df_transpose(df):
     df.columns = df.iloc[0]
     df = df[1:]
     return df
+
+
+def plot_rate_cap(echem_summary_df, charge=True, display_plot=False, save_dir=None):
+    if charge:
+        table_key = "Charge SpeCap/mAh/g"
+    else:
+        table_key = "Discharge SpeCap/mAh/g"
+    echem_summary_df.reset_index(inplace=True)  # this is here because the summary dataframe uses the cycle number as the index
+    echem_summary_df = echem_summary_df.loc[echem_summary_df['CycleNo'] != 0]
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.scatter(echem_summary_df['CycleNo'], echem_summary_df[table_key], s=100)
+    vline_pos = list(range(5, int(echem_summary_df['CycleNo'].max()), 5))
+    text_pos = list(range(1, int(echem_summary_df['CycleNo'].max()), 5))
+    ax.set_ylim(0, echem_summary_df[table_key].max()*1.2)
+    ax.set_xlim(0, echem_summary_df['CycleNo'].max()+1)
+    for pos in vline_pos:
+        ax.axvline(x=pos, color='gray', linestyle='--', alpha=0.7)
+    for pos in text_pos:
+        ax.text((pos+1), plt.gca().get_ylim()[1] * 0.9, f"{echem_summary_df['Current rate/mA/g'][pos]} mA g$^{{-1}}$",
+                horizontalalignment='center', bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'), fontsize=8)
+    tick_pos = np.arange(0, echem_summary_df['CycleNo'].max()+1, 1)
+    ax.set_xticks(tick_pos, minor=True)
+    ax.set_xticks(vline_pos)
+    ax.set_xticklabels(vline_pos)
+    ax.tick_params(axis='x', which='major', length=7)
+    ax.tick_params(axis='x', which='minor', length=4)
+    ax.set_xlabel('Cycle number', fontsize=16)
+    if charge:
+        ax.set_ylabel('Charge Specific Capacity/mAh g$^{-1}$', fontsize=16)
+    else:
+        ax.set_ylabel('Discharge Specific Capacity/mAh g$^{-1}$', fontsize=16)
+    if display_plot:
+        plt.show()
+    if save_dir:
+        plt.savefig(os.path.join(save_dir, f"rate_cap_{table_key}.png"))
+    return fig
